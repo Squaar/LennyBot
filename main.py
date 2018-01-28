@@ -6,6 +6,7 @@ import os
 
 OAUTH2_CLIENT_ID = os.environ['LENNYBOT_OAUTH2_CLIENT_ID']
 OAUTH2_CLIENT_SECRET = os.environ['LENNYBOT_OAUTH2_CLIENT_SECRET']
+OAUTH2_BOT_TOKEN = os.environ['LENNYBOT_OAUTH2_BOT_TOKEN']
 OAUTH2_REDIRECT_URI = 'http://localhost:5000/callback'
 
 API_BASE_URL = os.environ.get('API_BASE_URL', 'https://discordapp.com/api')
@@ -25,7 +26,7 @@ def token_updater(token):
 
 
 def make_session(token=None, state=None, scope=None):
-    return OAuth2Session(
+    session = OAuth2Session(
         client_id=OAUTH2_CLIENT_ID,
         token=token,
         state=state,
@@ -36,17 +37,30 @@ def make_session(token=None, state=None, scope=None):
             'client_secret': OAUTH2_CLIENT_SECRET,
         },
         auto_refresh_url=TOKEN_URL,
-        token_updater=token_updater)
+        token_updater=token_updater,
+    )
+    session.headers = {
+        'Authorization': 'Bot ' + OAUTH2_BOT_TOKEN
+    }
+    return session
 
 
+# TODO: something with scope here
+# TODO: permissions for bot
+#   permissions are being sent correctly - see them in the authorize screen, but unauthorized when getting m
 @app.route('/')
 def index():
     scope = request.args.get(
         'scope',
-        'identify email connections guilds guilds.join'
+        'identify guilds messages.read bot'
+    )
+    permissions = request.args.get(
+        'permissions',
+        0x00000008
     )
     discord = make_session(scope=scope.split(' '))
-    authorization_url, state = discord.authorization_url(AUTHORIZATION_BASE_URL)
+    authorization_url, state = discord.authorization_url(
+        AUTHORIZATION_BASE_URL, permissions=permissions)
     session['oauth2_state'] = state
     return redirect(authorization_url)
 
@@ -62,7 +76,7 @@ def callback():
         authorization_response=request.url
     )
     session['oauth2_token'] = token
-    return redirect(url_for('.me'))
+    return redirect(url_for('.test'))
 
 
 @app.route('/me')
@@ -72,6 +86,20 @@ def me():
     guilds = discord.get(API_BASE_URL + '/users/@me/guilds').json()
     connections = discord.get(API_BASE_URL + '/users/@me/connections').json()
     return jsonify(user=user, guilds=guilds, connections=connections)
+
+
+@app.route('/test')
+def test():
+    discord = make_session(token=session.get('oauth2_token'))
+    guilds = discord.get(API_BASE_URL + '/users/@me/guilds').json()
+    game_bois = [guild for guild in guilds if guild['name'] == 'Game Bois'][0]
+
+    channels = discord.get(API_BASE_URL + '/guilds/' + game_bois['id'] + '/channels').json()
+    app.logger.info(channels)
+
+    guild = discord.get(API_BASE_URL + '/guilds/' + game_bois['id']).json()
+
+    return jsonify(channels=channels, guild=guild)
 
 
 if __name__ == '__main__':
