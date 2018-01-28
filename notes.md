@@ -1,0 +1,3 @@
+- oauth2 service
+- python microservice backend
+- html/js frontend hosted by apache
