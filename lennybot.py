@@ -34,6 +34,8 @@ async def on_message(message):
             await emojiate(message)
         elif message.content.startswith('!emojify'):
             await emojify(message)
+        elif message.content.startswith('!clear-emojiate'):
+            await clear_emojiate(message)
         elif message.content.startswith('!channels'):
             await print_channels(message)
         elif message.content.startswith('!say'):
@@ -48,6 +50,13 @@ async def emojiate(message):
     target = await discord_client.get_message(channels[command[1]], command[2])
     for char in command[3].lower():
         await discord_client.add_reaction(target, a_to_emoji(char))
+
+
+# !clear-emojiate server/channel message_id
+async def clear_emojiate(message):
+    command = shlex.split(message.content)
+    target = await discord_client.get_message(channels[command[1]], command[2])
+    await discord_client.clear_reactions(target)
 
 
 # !say server/channel message
