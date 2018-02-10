@@ -32,12 +32,14 @@ async def on_message(message):
         # await discord_client.send_message(message.channel, emoji_alphabet['a'])
         if message.content.startswith('!emojiate'):
             await emojiate(message)
-        elif message.content.startswith('!say'):
-            await say(message)
         elif message.content.startswith('!emojify'):
             await emojify(message)
         elif message.content.startswith('!channels'):
             await print_channels(message)
+        elif message.content.startswith('!say'):
+            await say(message)
+        elif message.content.startswith('!tts'):
+            await say(message, tts=True)
 
 
 # !emojiate server/channel message_id reactions
@@ -49,10 +51,10 @@ async def emojiate(message):
 
 
 # !say server/channel message
-async def say(message):
+async def say(message, tts=False):
     command = shlex.split(message.content)
     command[2] = ' '.join(command[2:])
-    await discord_client.send_message(channels[command[1]], command[2])
+    await discord_client.send_message(channels[command[1]], command[2], tts=tts)
 
 
 # !emojify message
