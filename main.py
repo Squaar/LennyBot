@@ -1,8 +1,11 @@
 
 from flask import Flask, session, redirect, request, url_for, jsonify
 from requests_oauthlib import OAuth2Session
+import lennybot
 import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 OAUTH2_CLIENT_ID = os.environ['LENNYBOT_OAUTH2_CLIENT_ID']
 OAUTH2_CLIENT_SECRET = os.environ['LENNYBOT_OAUTH2_CLIENT_SECRET']
@@ -52,15 +55,14 @@ def make_session(token=None, state=None, scope=None):
 def index():
     scope = request.args.get(
         'scope',
-        'identify guilds messages.read bot'
+        'identify guilds messages.read'
     )
     permissions = request.args.get(
         'permissions',
         0x00000008
     )
     discord = make_session(scope=scope.split(' '))
-    authorization_url, state = discord.authorization_url(
-        AUTHORIZATION_BASE_URL, permissions=permissions)
+    authorization_url, state = discord.authorization_url(AUTHORIZATION_BASE_URL, permissions=permissions)
     session['oauth2_state'] = state
     return redirect(authorization_url)
 
@@ -103,4 +105,5 @@ def test():
 
 
 if __name__ == '__main__':
+    lennybot.discord_client.run(OAUTH2_BOT_TOKEN)
     app.run()
