@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 discord_client = discord.Client()
 channels = {}
-authorized_users = [135265595925987328]
+authorized_users = [135265595925987328, 137772624133488641]
 
 
 @discord_client.event
