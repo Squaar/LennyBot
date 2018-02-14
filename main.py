@@ -5,6 +5,7 @@ import threading
 import lennyservice
 import os
 
+##TODO: put some timestamps on this log
 logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(threadname)s:%(name)s:%(message)s')
 logger = logging.getLogger(__name__)
 

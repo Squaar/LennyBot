@@ -3,6 +3,7 @@ from flask import Flask, session, redirect, request, url_for, jsonify
 from requests_oauthlib import OAuth2Session
 import os
 import logging
+import lennybot
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,9 +49,6 @@ def make_session(token=None, state=None, scope=None):
     return session
 
 
-# TODO: something with scope here
-# TODO: permissions for bot
-#   permissions are being sent correctly - see them in the authorize screen, but unauthorized when getting m
 @app.route('/')
 def index():
     scope = request.args.get(
@@ -67,6 +65,9 @@ def index():
     return redirect(authorization_url)
 
 
+# I think this token is the authorization token needed for requests
+# probably shouldn't save that in the session... need to return to the page so it can be sent in subsequent requests
+# should be sent back to microservice in post arg
 @app.route('/callback')
 def callback():
     if request.values.get('error'):
@@ -78,7 +79,7 @@ def callback():
         authorization_response=request.url
     )
     session['oauth2_token'] = token
-    return redirect(url_for('.test'))
+    return redirect(url_for('.me'))
 
 
 @app.route('/me')
@@ -87,21 +88,20 @@ def me():
     user = discord.get(API_BASE_URL + '/users/@me').json()
     guilds = discord.get(API_BASE_URL + '/users/@me/guilds').json()
     connections = discord.get(API_BASE_URL + '/users/@me/connections').json()
-    return jsonify(user=user, guilds=guilds, connections=connections)
+    ##TODO: how do we handle standalone service w/ no bot? should we need to? 
+    return jsonify(user=user, guilds=guilds, connections=connections, asyncio_loop=id(lennybot.asyncio.get_event_loop()), discord_loop=id(lennybot.discord_client.loop))
 
 
-@app.route('/test')
-def test():
+##TODO: need to refactor lennybot commands to take args for this to work
+# @app.route('/hellotest')
+# def hello_test():
+#     discord = make_session(token=session.get('oauth2_token'))
+
+
+@app.route('/channels')
+def channels():
     discord = make_session(token=session.get('oauth2_token'))
-    guilds = discord.get(API_BASE_URL + '/users/@me/guilds').json()
-    game_bois = [guild for guild in guilds if guild['name'] == 'Game Bois'][0]
-
-    channels = discord.get(API_BASE_URL + '/guilds/' + game_bois['id'] + '/channels').json()
-    app.logger.info(channels)
-
-    guild = discord.get(API_BASE_URL + '/guilds/' + game_bois['id']).json()
-
-    return jsonify(channels=channels, guild=guild)
+    return jsonify(lennybot_channels=str(lennybot.channels))
 
 
 if __name__ == '__main__':
