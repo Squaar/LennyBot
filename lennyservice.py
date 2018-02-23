@@ -89,7 +89,7 @@ def me():
     guilds = discord.get(API_BASE_URL + '/users/@me/guilds').json()
     connections = discord.get(API_BASE_URL + '/users/@me/connections').json()
     ##TODO: how do we handle standalone service w/ no bot? should we need to? 
-    return jsonify(user=user, guilds=guilds, connections=connections, asyncio_loop=id(lennybot.asyncio.get_event_loop()), discord_loop=id(lennybot.discord_client.loop))
+    return jsonify(user=user, guilds=guilds, connections=connections)
 
 
 ##TODO: need to refactor lennybot commands to take args for this to work
