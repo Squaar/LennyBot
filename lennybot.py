@@ -4,11 +4,9 @@ import asyncio
 import logging
 import shlex
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message)s')
 logger = logging.getLogger(__name__)
 
-# discord_client = discord.Client()
-# channels = {}
 authorized_users = [135265595925987328, 137772624133488641]
 
 ##TODO: rewrite so methods take specific args, call with info from the message
@@ -113,9 +111,9 @@ class LennyBot(discord.Client):
         await self.send_message(message.channel, [list(map(lambda x: x.name, channel.recipients)) for channel in self.private_channels])
         # await self.send_message(message.channel, [channel.id for channel in self.private_channels])
 
+    ##TODO: private messaging doesn't work, probably doing it wrong
     async def message_squaar(self, message):
         channel = filter(lambda x: x.id == '411407327938215949', self.private_channels)[0]
-        logger.info('messaging squaar: %s' % message)
         await self.send_message(channel, message)
 
 
