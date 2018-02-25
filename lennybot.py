@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 # channels = {}
 authorized_users = [135265595925987328, 137772624133488641]
 
-##TODO: rewrite to subclass discord.client
 ##TODO: rewrite so methods take specific args, call with info from the message
 # this way we can call them from other places too
 # but it also needs a reference to the channel
@@ -60,6 +59,8 @@ class LennyBot(discord.Client):
             await self.clear_emojiate(message)
         elif message.content.startswith('!channels'):
             await self.print_channels(message)
+        elif message.content.startswith('!private-channels'):
+            await self.print_private_channels(message)
         elif message.content.startswith('!say'):
             await self.say(message)
         elif message.content.startswith('!tts'):
@@ -105,6 +106,17 @@ class LennyBot(discord.Client):
             await self.send_message(message.channel, [channel.split('/')[1] for channel in filtered])
         else:
             await self.send_message(message.channel, list(self.channels.keys()))
+
+    @authenticate
+    async def print_private_channels(self, message):
+        # command = shlex.split(message.content)
+        await self.send_message(message.channel, [list(map(lambda x: x.name, channel.recipients)) for channel in self.private_channels])
+        # await self.send_message(message.channel, [channel.id for channel in self.private_channels])
+
+    async def message_squaar(self, message):
+        channel = filter(lambda x: x.id == '411407327938215949', self.private_channels)[0]
+        logger.info('messaging squaar: %s' % message)
+        await self.send_message(channel, message)
 
 
 def str_to_emoji(string):
