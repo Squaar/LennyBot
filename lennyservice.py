@@ -1,5 +1,6 @@
 
 from requests_oauthlib import OAuth2Session
+from functools import wraps
 import flask
 import os
 import logging
@@ -8,6 +9,16 @@ import asyncio
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message)s')
 logger = logging.getLogger(__name__)
+
+
+def authenticate(func):
+    @wraps(func)
+    def check_authentication(*args, **kwargs):
+        if not flask.session.get('oauth2_token'):
+            return flask.redirect(flask.url_for('.login'))
+        else:
+            return func(*args, **kwargs)
+    return check_authentication
 
 
 class LennyService(flask.Flask):
@@ -28,6 +39,7 @@ class LennyService(flask.Flask):
 
         self._bot = bot
         self.route('/')(self.index)
+        self.route('/login')(self.login)
         self.route('/callback')(self.callback)
         self.route('/lennybot')(self.lenny)
         self.route('/channels')(self.channels)
@@ -55,14 +67,16 @@ class LennyService(flask.Flask):
             # token_updater = (lambda x: session['oauth2_token'] = x),
         )
 
-    def index(self):
+    def login(self):
         scope = flask.request.args.get('scope', 'identify guilds messages.read')
-        # permissions = request.args.get('permissions', 0x00000008)
         discord = self.make_session(scope=scope.split(' '))
-        # authorization_url, state = discord.authorization_url(_AUTHORIZATION_BASE_URL, permissions=permissions)
         authorization_url, state = discord.authorization_url(self._AUTHORIZATION_BASE_URL)
         flask.session['oauth2_state'] = state
         return flask.redirect(authorization_url)
+
+    @authenticate
+    def index(self):
+        return 'index'
 
     def callback(self):
         if flask.request.values.get('error'):
@@ -75,7 +89,7 @@ class LennyService(flask.Flask):
         )
         flask.session['oauth2_token'] = token
         flask.session['user_id'] = discord.get(self._API_BASE_URL + '/users/@me').json()['id']
-        return flask.redirect(flask.url_for('.lenny'))
+        return flask.redirect(flask.url_for('.index'))
 
     def lenny(self):
         discord = self.make_session(token=flask.session.get('oauth2_token'))
