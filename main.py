@@ -13,6 +13,7 @@ OAUTH2_BOT_TOKEN = os.environ['LENNYBOT_OAUTH2_BOT_TOKEN']
 
 
 # asyncio loses its event loop when you run it in a thread
+# passing the loop through bot's constructor still makes it dissapear
 def run_lennybot_thread(bot, event_loop):
     lennybot.asyncio.set_event_loop(event_loop)
     bot.run(OAUTH2_BOT_TOKEN)

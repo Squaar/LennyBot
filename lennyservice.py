@@ -99,10 +99,8 @@ class LennyService(flask.Flask):
         return flask.jsonify(user=user, guilds=guilds, connections=connections, sessionid=flask.session.get('user_id'))
 
     def channels(self):
-        # discord = self.make_session(token=flask.session.get('oauth2_token'))
-        # self._bot.loop.call_soon_threadsafe(self._bot.message_squaar, 'test')
-        logger.info('loop from service: %s' % id(self._bot.loop))
-        asyncio.run_coroutine_threadsafe(self._bot.message_squaar('test'), self._bot.loop)
+        # asyncio.run_coroutine_threadsafe(self._bot.say_channels(flask.session, self._bot.find_private_channel(['Squaar'])), self._bot.loop)
+        asyncio.run_coroutine_threadsafe(self._bot.message_squaar(flask.session, 'test'), self._bot.loop)
         return flask.jsonify(channels=dict((server, list(channels.keys())) for server, channels in self._bot.channels_as_dict().items()))
 
 
