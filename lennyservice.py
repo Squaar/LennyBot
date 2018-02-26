@@ -96,7 +96,6 @@ class LennyService(flask.Flask):
         user = discord.get(self._API_BASE_URL + '/users/@me').json()
         guilds = discord.get(self._API_BASE_URL + '/users/@me/guilds').json()
         connections = discord.get(self._API_BASE_URL + '/users/@me/connections').json()
-        ##TODO: how do we handle standalone service w/ no bot? should we need to?
         return flask.jsonify(user=user, guilds=guilds, connections=connections, sessionid=flask.session.get('user_id'))
 
     def channels(self):
@@ -104,7 +103,7 @@ class LennyService(flask.Flask):
         # self._bot.loop.call_soon_threadsafe(self._bot.message_squaar, 'test')
         logger.info('loop from service: %s' % id(self._bot.loop))
         asyncio.run_coroutine_threadsafe(self._bot.message_squaar('test'), self._bot.loop)
-        return flask.jsonify(channels=list(self._bot.channels.keys()))
+        return flask.jsonify(channels=dict((server, list(channels.keys())) for server, channels in self._bot.channels_as_dict().items()))
 
 
 # This isn't really meant to be run without the bot. Things will break! Try running from main.py instead
