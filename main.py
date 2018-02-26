@@ -14,6 +14,7 @@ OAUTH2_BOT_TOKEN = os.environ['LENNYBOT_OAUTH2_BOT_TOKEN']
 
 
 def run_lennybot_thread(bot, event_loop):
+    bot.loop = event_loop
     bot.run(OAUTH2_BOT_TOKEN)
 
 
