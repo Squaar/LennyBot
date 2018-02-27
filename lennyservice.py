@@ -48,6 +48,7 @@ class LennyService(flask.Flask):
         threading.current_thread().setName('t_lennyservice')
         super().run(*args, **kwargs)
 
+    ##TODO: move this into make_session?
     def token_updater(self, token):
         flask.session['oauth2_token'] = token
 

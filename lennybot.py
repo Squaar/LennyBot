@@ -3,17 +3,13 @@ import discord
 import logging
 import shlex
 import werkzeug
-import asyncio
+import asyncio  # need to import this for threading
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message)s')
 logger = logging.getLogger(__name__)
 
 authorized_users = [135265595925987328, 137772624133488641]
 
-##TODO: rewrite so methods take specific args, call with info from the message
-    # this way we can call them from other places too
-    # but it also needs a reference to the channel
-    # can we just add discord_client methods to the event loop from the service directly?
 ##TODO: use embedded objects for say_channels and a help command
 ##TODO: build text prediction module
     # http://www.stat.purdue.edu/~mdw/CSOI/MarkovLab.html
@@ -95,18 +91,15 @@ class LennyBot(discord.Client):
 
             # !channels [server_filter]
             elif message.content.startswith('!channels'):
-                server_filter = ' '.join(command[1:])
-                await self.say_channels(message, message.channel, server_filter)
+                await self.say_channels(message, message.channel, ' '.join(command[1:]))
             elif message.content.startswith('!private-channels'):
                 await self.print_private_channels(message)
 
             # !say server channel message
             elif message.content.startswith('!say'):
-                command[3] = ' '.join(command[3:])
-                await self.say(message, command[1], command[2], command[3])
+                await self.say(message, command[1], command[2], ' '.join(command[3:]))
             elif message.content.startswith('!tts'):
-                command[3] = ' '.join(command[3:])
-                await self.say(message, command[1], command[2], command[3], tts=True)
+                await self.say(message, command[1], command[2], ' '.join(command[3:]), tts=True)
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
