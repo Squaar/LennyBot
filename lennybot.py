@@ -1,9 +1,7 @@
 from functools import wraps
 import discord
-import asyncio
 import logging
 import shlex
-import flask
 import werkzeug
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message)s')
@@ -12,9 +10,18 @@ logger = logging.getLogger(__name__)
 authorized_users = [135265595925987328, 137772624133488641]
 
 ##TODO: rewrite so methods take specific args, call with info from the message
-# this way we can call them from other places too
-# but it also needs a reference to the channel
-# can we just add discord_client methods to the event loop from the service directly?
+    # this way we can call them from other places too
+    # but it also needs a reference to the channel
+    # can we just add discord_client methods to the event loop from the service directly?
+##TODO: use embedded objects for say_channels and a help command
+##TODO: build text prediction module
+    # http://www.stat.purdue.edu/~mdw/CSOI/MarkovLab.html
+    # store training data/probability matrix in sqlite
+        # https://github.com/jreese/aiosqlite
+    # could use send_typing() to signify still processing?
+##TODO: better logging, esp. when responding to commands
+    # log what user requested the command from the context
+    # could we do this from authenticate()?
 
 
 ##TODO: this could be done smarter
@@ -72,12 +79,18 @@ class LennyBot(discord.Client):
         logger.info('%s/%s[%s]: %s' % (message.server, message.channel, message.author, message.content.encode('utf-8')))
         if message.content[0] == '!':
             command = shlex.split(message.content)
+
+            # !emojiate server channel message_id reactions
             if message.content.startswith('!emojiate'):
-                await self.emojiate(message)
+                await self.emojiate(message, command[1], command[2], command[3], command[4])
+
+            # !emojify message
             elif message.content.startswith('!emojify'):
-                await self.emojify(message)
+                await self.emojify(message, ' '.join(command[1:]))
+
+            # !clear-emojiate server channel message_id
             elif message.content.startswith('!clear-emojiate'):
-                await self.clear_emojiate(message)
+                await self.clear_emojiate(message, command[1], command[2], command[3])
 
             # !channels [server_filter]
             elif message.content.startswith('!channels'):
@@ -85,40 +98,34 @@ class LennyBot(discord.Client):
                 await self.say_channels(message, message.channel, server_filter)
             elif message.content.startswith('!private-channels'):
                 await self.print_private_channels(message)
+
+            # !say server channel message
             elif message.content.startswith('!say'):
-                await self.say(message)
+                command[3] = ' '.join(command[3:])
+                await self.say(message, command[1], command[2], command[3])
             elif message.content.startswith('!tts'):
-                await self.say(message, tts=True)
+                command[3] = ' '.join(command[3:])
+                await self.say(message, command[1], command[2], command[3], tts=True)
 
-    # !emojiate server channel message_id reactions
     @authenticate
-    async def emojiate(self, message):
-        command = shlex.split(message.content)
-        target = await self.get_message(self.find_channel(command[1], command[2]), command[3])
-        for char in command[4].lower():
-            await self.add_reaction(target, self.a_to_emoji(char))
+    async def emojiate(self, context, server, channel, message_id, reactions):
+        target = await self.get_message(self.find_channel(server, channel), message_id)
+        for char in reactions.lower():
+            await self.add_reaction(target, a_to_emoji(char))
 
-    # !clear-emojiate server channel message_id
     @authenticate
-    async def clear_emojiate(self, message):
-        command = shlex.split(message.content)
-        target = await self.get_message(self.find_channel(command[1], command[2]), command[3])
+    async def clear_emojiate(self, context, server, channel, message_id):
+        target = await self.get_message(self.find_channel(server, channel), message_id)
         await self.clear_reactions(target)
 
-    # !say server channel message
     @authenticate
-    async def say(self, message, tts=False):
-        command = shlex.split(message.content)
-        command[3] = ' '.join(command[3:])
-        await self.send_message(self.find_channel(command[1], command[2]), command[3], tts=tts)
+    async def say(self, context, server, channel, message, tts=False):
+        await self.send_message(self.find_channel(server, channel), message, tts=tts)
 
-    # !emojify message
     @authenticate
-    async def emojify(self, message):
-        command = shlex.split(message.content)
-        command[1] = ' '.join(command[1:])
-        logger.info(command[1])
-        await self.send_message(message.channel, self.str_to_emoji(command[1]))
+    async def emojify(self, context, message):
+        logger.info(message)
+        await self.send_message(context.channel, str_to_emoji(message))
 
     @authenticate
     async def say_channels(self, context, channel, server_filter=None):
@@ -129,11 +136,10 @@ class LennyBot(discord.Client):
             await self.send_message(channel, str(dict((server, list(channels.keys())) for server, channels in self.channels_as_dict().items())))
 
     @authenticate
-    async def print_private_channels(self, message):
-        # command = shlex.split(message.content)
+    async def print_private_channels(self, context):
         await self.send_message(list(self.private_channels)[0], 'lennybot online')
         logger.info('private channels %s' % len(self.private_channels))
-        await self.send_message(message.channel, [list(map(lambda x: x.name, channel.recipients)) for channel in self.private_channels])
+        await self.send_message(context.channel, [list(map(lambda x: x.name, channel.recipients)) for channel in self.private_channels])
         # await self.send_message(message.channel, [channel.id for channel in self.private_channels])
 
     @authenticate
