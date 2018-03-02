@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message
 logger = logging.getLogger(__name__)
 
 authorized_users = [135265595925987328, 137772624133488641]
+lennys_id = 160962479013363712
 
 ##TODO: use embedded objects for say_channels and a help command
 ##TODO: build text prediction module
@@ -19,6 +20,7 @@ authorized_users = [135265595925987328, 137772624133488641]
 ##TODO: better logging, esp. when responding to commands
     # log what user requested the command from the context
     # could we do this from authenticate()?
+##TODO: make emojify mode - deletes and reposts messages from users as emojify?
 
 
 ##TODO: this could be done smarter
@@ -26,8 +28,6 @@ def authenticate(func):
     @wraps(func)
     def with_authentication(*args, **kwargs):
         ##TODO: throw this in a big ol' or
-        logger.info('context type: %s' % type(args[1]))
-        logger.info('context: %s' % args[1])
         if len(args) > 0 and type(args[1]) == discord.message.Message and int(args[1].author.id) in authorized_users:
             return func(*args, **kwargs)
         elif len(args) > 0 and type(args[1]) == werkzeug.local.LocalProxy and int(args[1]['user_id']) in authorized_users:
@@ -39,8 +39,9 @@ def authenticate(func):
 
 class LennyBot(discord.Client):
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._realboi = False
 
     def find_channel(self, server_name, channel_name):
         for channel in self.get_all_channels():
@@ -74,7 +75,15 @@ class LennyBot(discord.Client):
     ##TODO: private messaging
     async def on_message(self, message):
         logger.info('%s/%s[%s]: %s' % (message.server, message.channel, message.author, message.content.encode('utf-8')))
-        if message.content[0] == '!':
+
+        if self._realboi and int(message.author.id) == lennys_id:
+            message_content = message.content
+            channel = message.channel
+            tts = message.tts
+            await self.delete_message(message)
+            await self.send_message(channel, message_content, tts=tts)
+
+        elif message.content[0] == '!':
             command = shlex.split(message.content)
 
             # !emojiate server channel message_id reactions
@@ -100,6 +109,10 @@ class LennyBot(discord.Client):
                 await self.say(message, command[1], command[2], ' '.join(command[3:]))
             elif message.content.startswith('!tts'):
                 await self.say(message, command[1], command[2], ' '.join(command[3:]), tts=True)
+
+            # !realboi on/off
+            elif message.content.startswith('!realboi'):
+                self.realboi(message, command[1])
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
@@ -141,6 +154,14 @@ class LennyBot(discord.Client):
         for member in self.get_all_members():
             if int(member.id) == 135265595925987328:
                 await self.send_message(member, message)
+                return
+
+    @authenticate
+    def realboi(self, context, state):
+        if (type(state) == str and state.lower() == 'on') or state is True:
+            self._realboi = True
+        elif (type(state) == str and state.lower() == 'off') or state is False:
+            self._realboi = False
 
 
 def str_to_emoji(string):
