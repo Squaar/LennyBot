@@ -12,11 +12,6 @@ authorized_users = [135265595925987328, 137772624133488641]
 lennys_id = 160962479013363712
 
 ##TODO: use embedded objects for say_channels and a help command
-##TODO: build text prediction module
-    # http://www.stat.purdue.edu/~mdw/CSOI/MarkovLab.html
-    # store training data/probability matrix in sqlite
-        # https://github.com/jreese/aiosqlite
-    # could use send_typing() to signify still processing?
 ##TODO: better logging, esp. when responding to commands
     # log what user requested the command from the context
     # could we do this from authenticate()?
@@ -162,6 +157,7 @@ class LennyBot(discord.Client):
             self._realboi = True
         elif (type(state) == str and state.lower() == 'off') or state is False:
             self._realboi = False
+        logger.info('Realboi mode: %s' % self._realboi)
 
 
 def str_to_emoji(string):
