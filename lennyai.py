@@ -47,12 +47,12 @@ class TextPredictor():
             seed += next_char
         return seed
 
-    ##TODO: instead of storing the whole next chunk, could we just store the next character?
     async def train(self, data, reset=False, order=1):
+        logger.info('Training... This may take a few minutes.')
         if not self._counts or not self._probabilities or reset:
             await self.reset(order)
         data = ''.join(filter(lambda x: x in self._chars, data))
-        for i in range(len(data) - self._order - 1):
+        for i in range(len(data) - self._order):
             curr_chunk = data[i:i + self._order]
             next_char = data[i + self._order]
             self._counts[curr_chunk][next_char] += 1
@@ -67,6 +67,7 @@ class TextPredictor():
                     self._probabilities[curr_chunk][next_char] = 0
 
     async def reset(self, order):
+        logger.info('Resetting TextPredictor model. This may take a few minutes.')
         if order <= 0:
             raise ValueError('Order must be >= 1')
         self._order = order
@@ -89,15 +90,17 @@ class TextPredictor():
 
 if __name__ == '__main__':
     async def test():
+        import glob
         predictor = await TextPredictor.create(3)
-        await predictor.train(training_data)
-        print(predictor.predict('poop', 20))
+        files = glob.glob('ai_training/*.txt')
 
-    training_data = ''
-    with open('ai_training/alice29.txt', 'r') as f:
-        training_data = f.read()
-    logger.info('Opened training data file: %s' % len(training_data))
+        for file in files:
+            training_data = ''
+            with open(file, 'r') as f:
+                training_data = f.read()
+            logger.info('Loaded training data file: %s (%s)' % (file, len(training_data)))
+            await predictor.train(training_data)
+
+        print(predictor.predict('I am Lenny', 100))
 
     asyncio.get_event_loop().run_until_complete(test())
-
-    # TextPredictor(1).train(training_data)
