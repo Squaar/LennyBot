@@ -18,10 +18,10 @@ class TextPredictor():
     def __init__(self):
         self._counts = None
         self._probabilities = None
-        # A-Z: 65-90, a-z: 97-122
+
         ##TODO: add more later or think of a better way. just list all of some char set?
-        self._chars = [chr(i) for i in range(65, 91)]
-        self._chars += [chr(i) for i in range(97, 123)]
+        self._chars = [chr(i) for i in range(65, 91)]  # A-Z: 65-90
+        self._chars += [chr(i) for i in range(97, 123)]  # a-z: 97-122
         self._chars += [str(i) for i in range(10)]
         self._chars += [' ', '.', '!', '?', ',']
 
@@ -32,12 +32,14 @@ class TextPredictor():
         return self
 
     def predict(self, seed, length):
+        seed = self.clean(seed)
         if length <= 0:
-            raise ValueError('Length must be > 0')
+            raise ValueError('Length must be > 0. Cleaned seed length: %s' % len(seed))
         if len(seed) < self._order:
-            raise ValueError('Seed is not long enough. Order: %s' % self._order)
+            raise ValueError('Seed is not long enough. Order: %s, Cleaned seed length: %s' % (self._order, len(seed)))
         if len(seed) >= length:
             return seed
+
         while len(seed) < length:
             curr_chunk = seed[-1 * self._order: len(seed)]
 
@@ -47,11 +49,14 @@ class TextPredictor():
             seed += next_char
         return seed
 
+    def clean(self, s):
+        return ''.join(filter(lambda x: x in self._chars, s))
+
     async def train(self, data, reset=False, order=1):
         logger.info('Training... This may take a few minutes.')
         if not self._counts or not self._probabilities or reset:
             await self.reset(order)
-        data = ''.join(filter(lambda x: x in self._chars, data))
+        data = self.clean(data)
         for i in range(len(data) - self._order):
             curr_chunk = data[i:i + self._order]
             next_char = data[i + self._order]
@@ -86,6 +91,14 @@ class TextPredictor():
                 next_perm += [perm + char for char in chars]
             permutations = next_perm
         return permutations
+
+class TextModel():
+
+    def __init__():
+        pass
+
+    def reset(self):
+        pass
 
 
 if __name__ == '__main__':

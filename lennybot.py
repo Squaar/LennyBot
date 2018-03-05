@@ -16,6 +16,7 @@ lennys_id = 160962479013363712
     # log what user requested the command from the context
     # could we do this from authenticate()?
 ##TODO: make emojify mode - deletes and reposts messages from users as emojify?
+##TODO: better error handling - should report back in chat with stack trace. is there an on_error()?
 
 
 ##TODO: this could be done smarter
