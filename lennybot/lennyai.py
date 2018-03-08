@@ -7,13 +7,10 @@ logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message
 logger = logging.getLogger(__name__)
 
 # http://www.stat.purdue.edu/~mdw/CSOI/MarkovLab.html
-
-##TODO: self._count and self._probabilities get very big very fast. need to use db
-    # https://github.com/jreese/aiosqlite
 # could use send_typing() to signify still processing?
 
 
-class TextPredictor():
+class TextPredictor:
 
     def __init__(self):
         ##TODO: add more later or think of a better way. just list all of some char set?
@@ -71,8 +68,6 @@ class TextPredictor():
         # Run this async because it can take a while
         permutations = await asyncio.get_event_loop().run_in_executor(None, self.build_permutations, self._model.get_chars(), order)
         await self._model.reset(permutations)
-        print(self._model.size())
-        print(type(self._model.size()))
         logger.info('Reset TextPredictor matrices to {0}x{1}'.format(*self._model.size()))
 
     @staticmethod
@@ -86,7 +81,7 @@ class TextPredictor():
         return permutations
 
 
-class TextModel():
+class TextModel:
 
     def __init__(self, chars):
         self._counts = None
@@ -131,6 +126,8 @@ if __name__ == '__main__':
         import glob
         predictor = await TextPredictor.create(3)
         files = glob.glob('ai_training/*.txt')
+        if not files:
+            raise Exception('No training files found.')
 
         for file in files:
             training_data = ''

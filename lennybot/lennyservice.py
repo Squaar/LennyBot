@@ -105,6 +105,6 @@ class LennyService(flask.Flask):
         return flask.jsonify(channels=dict((server, list(channels.keys())) for server, channels in self._bot.channels_as_dict().items()))
 
 
-# This isn't really meant to be run without the bot. Things will break! Try running from main.py instead
+# This isn't really meant to be run without the bot. Things will break! Try running from lennyrunner.py instead
 if __name__ == '__main__':
     LennyService(None, __name__).run(host='0.0.0.0')
