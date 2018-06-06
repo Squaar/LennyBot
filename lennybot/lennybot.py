@@ -37,7 +37,7 @@ class LennyBot(discord.Client):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._realboi = False
+        self._realboi = True
 
     def find_channel(self, server_name, channel_name):
         for channel in self.get_all_channels():
