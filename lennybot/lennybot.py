@@ -38,7 +38,7 @@ class LennyBot(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._realboi = True
-        self._dadmode = False
+        self._dadmode = True
         self._hi_im_lenny = True
 
     def find_channel(self, server_name, channel_name):
@@ -81,12 +81,6 @@ class LennyBot(discord.Client):
             await self.delete_message(message)
             await self.send_message(channel, message_content, tts=tts)
 
-        ##TODO: support for 'im'
-        elif self._dadmode and ("i'm " in message.content.lower() or 'i am ' in message.content.lower()):
-            pass  # TODO: get these dad jokes flowin'
-            # dadjoke = self._calc_dadjoke(message)
-            # await self.send_message(message.channel, dadjoke, tts=message.tts)
-
         elif message.content[0] == '!':
             command = shlex.split(message.content)
 
@@ -123,14 +117,21 @@ class LennyBot(discord.Client):
                 self.dadmode(message, command[1])
 
             # !hi_im_lenny on/off
-            elif message.content.startswith('hi_im_lenny'):
+            elif message.content.startswith('!hi_im_lenny'):
                 self.hi_im_lenny_mode(message, command[1])
 
-        elif self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
-            await self.hi_im_lenny(message)
+        else:
+            if self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
+                await self.hi_im_lenny(message)
+
+            if self._dadmode:
+                i = self._find_dadjokable(message)
+                if i >= 0:
+                    dadjoke = self._calc_dadjoke(message, i)
+                    await self.send_message(message.channel, dadjoke, tts=message.tts)
 
     async def hi_im_lenny(self, message):
-        await self.send_message(message.channel, 'Hello, I\'m the real Lenny', tts=message.tts)
+        await self.send_message(message.channel, 'Hello, I\'m the real Lenny!', tts=message.tts)
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
@@ -202,9 +203,23 @@ class LennyBot(discord.Client):
             log.warn('Unrecognized state for hi_im_lenny_mode: %s' % state)
         logger.info('hi_im_lenny mode: %s' % self._hi_im_lenny)
 
+    # TODO: could use regex?
+    # looks for triggers to be either at the beginning of the message or somewhere in the middle with a space to
+    # prevent triggering off the end of other words
+    def _find_dadjokable(self, message):
+        dadjoke_triggers = ['i\'m ', 'i am ' 'im ']
+        for trigger in dadjoke_triggers:
+            if message.content.find(trigger) == 0:
+                return len(trigger)
+            elif ' ' + trigger in message.content:
+                return message.content.find(' ' + trigger) + len(trigger) + 1 # for the space
+        return -1
+
     ##TODO: implement dadjokes
-    def _calc_dadjoke(self, context):
-        pass
+    # TODO: find a way to determine where to end the joke. punctuation?
+    # i: beginning of the dadjokable clause
+    def _calc_dadjoke(self, message, i=0):
+        return 'Hi %s! I\'m the real Lenny.' % message.content[i:]
 
 def str_to_emoji(string):
     string = string.lower()
