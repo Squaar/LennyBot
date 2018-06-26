@@ -38,6 +38,7 @@ class LennyBot(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._realboi = True
+        self._hi_im_lenny = True
 
     def find_channel(self, server_name, channel_name):
         for channel in self.get_all_channels():
@@ -109,6 +110,12 @@ class LennyBot(discord.Client):
             # !realboi on/off
             elif message.content.startswith('!realboi'):
                 self.realboi(message, command[1])
+
+        elif self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
+            await self.hi_im_lenny(message)
+
+    async def hi_im_lenny(self, message):
+        await self.send_message(message.channel, 'Hello, I\'m the real Lenny', tts=message.tts)
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
