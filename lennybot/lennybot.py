@@ -38,6 +38,7 @@ class LennyBot(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._realboi = True
+        self._dadmode = False
         self._hi_im_lenny = True
 
     def find_channel(self, server_name, channel_name):
@@ -80,6 +81,12 @@ class LennyBot(discord.Client):
             await self.delete_message(message)
             await self.send_message(channel, message_content, tts=tts)
 
+        ##TODO: support for 'im'
+        elif self._dadmode and ("i'm " in message.content.lower() or 'i am ' in message.content.lower()):
+            pass  # TODO: get these dad jokes flowin'
+            # dadjoke = self._calc_dadjoke(message)
+            # await self.send_message(message.channel, dadjoke, tts=message.tts)
+
         elif message.content[0] == '!':
             command = shlex.split(message.content)
 
@@ -110,6 +117,14 @@ class LennyBot(discord.Client):
             # !realboi on/off
             elif message.content.startswith('!realboi'):
                 self.realboi(message, command[1])
+
+            # !dadmode on/off
+            elif message.content.startswith('!dadmode'):
+                self.dadmode(message, command[1])
+
+            # !hi_im_lenny on/off
+            elif message.content.startswith('hi_im_lenny'):
+                self.hi_im_lenny_mode(message, command[1])
 
         elif self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
             await self.hi_im_lenny(message)
@@ -167,6 +182,29 @@ class LennyBot(discord.Client):
             self._realboi = False
         logger.info('Realboi mode: %s' % self._realboi)
 
+    @authenticate
+    def dadmode(self, context, state):
+        if (type(state) == str and state.lower() == 'on') or state is True:
+            self._dadmode = True
+        elif (type(state) == str and state.lower() == 'off') or state is False:
+            self._dadmode = False
+        else:
+            log.warn('Unrecognized state for dadmode: %s' % state)
+        logger.info('Dad mode: %s' % self._dadmode)
+
+    @authenticate
+    def hi_im_lenny_mode(self, context, state):
+        if (type(state) == str and state.lower() == 'on') or state is True:
+            self._hi_im_lenny = True
+        elif (type(state) == str and state.lower() == 'off') or state is False:
+            self._hi_im_lenny = False
+        else:
+            log.warn('Unrecognized state for hi_im_lenny_mode: %s' % state)
+        logger.info('hi_im_lenny mode: %s' % self._hi_im_lenny)
+
+    ##TODO: implement dadjokes
+    def _calc_dadjoke(self, context):
+        pass
 
 def str_to_emoji(string):
     string = string.lower()
