@@ -5,18 +5,20 @@ import shlex
 import werkzeug
 import asyncio  # need to import this for threading
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s-%(name)s-%(message)s')
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
 logger = logging.getLogger(__name__)
 
 authorized_users = [135265595925987328, 137772624133488641]
-lennys_id = 160962479013363712
+lennys_id = 160962479013363712  # human lenny
+# lennys_id = 135265595925987328  # squaar
+squaars_id = 135265595925987328
 
 ##TODO: use embedded objects for say_channels and a help command
 ##TODO: better logging, esp. when responding to commands
     # log what user requested the command from the context
     # could we do this from authenticate()?
-##TODO: make emojify mode - deletes and reposts messages from users as emojify?
-##TODO: better error handling - should report back in chat with stack trace. is there an on_error()?
+##TODO: better error handling - should report back in chat with stack trace? is there an on_error()?
+##TODO: watch for lenny in voice channels and follow
 
 
 ##TODO: this could be done smarter
@@ -42,9 +44,11 @@ class LennyBot(discord.Client):
         self._hi_im_lenny = True
 
     def find_channel(self, server_name, channel_name):
-        for channel in self.get_all_channels():
-            if channel.server.name == server_name and channel.name == channel_name:
-                return channel
+        for server in self.guilds:
+            if server.name == server_name:
+                for channel in server.channels:
+                    if channel.name == channel_name:
+                        return channel
         raise ChannelNotFoundError(server_name, channel_name, 'Could not find %s/%s' % (server_name, channel_name))
 
     ##TODO: self.private_channels is only populated with private channels since logging in. find a way to update it in on_ready
@@ -56,30 +60,38 @@ class LennyBot(discord.Client):
                 return channel
         raise ChannelNotFoundError('private', str(recipients), 'Could not find private channel with recipients: %s' % recipients)
 
+    async def find_message(self, server_name, channel_name, message_id, history_limit=10000):
+        message_id = int(message_id)
+        channel = self.find_channel(server_name, channel_name)
+        async for message in channel.history(limit=history_limit):
+            if message.id == message_id:
+                return message
+
     def channels_as_dict(self):
         channels = list(self.get_all_channels())
-        d = dict((channel.server.name, {}) for channel in channels)
+        d = dict((channel.guild.name, {}) for channel in channels)
         for channel in channels:
-            d[channel.server.name][channel.name] = channel
+            d[channel.guild.name][channel.name] = channel
         return d
 
     async def on_ready(self):
         logger.info('Lennybot logged in: %s, %s' % (self.user.name, self.user.id))
         try:
-            await self.join_voice_channel(self.find_channel('Game Bois', 'Lenny land'))
+            lenny_land = self.find_channel('Game Bois', 'Lenny land')
+            await lenny_land.connect()
         except RuntimeError as e:
-            logger.warn(e)
+            logger.warning(e)
 
     ##TODO: private messaging
     async def on_message(self, message):
-        logger.info('%s/%s[%s]: %s' % (message.server, message.channel, message.author, message.content.encode('utf-8')))
+        logger.info('%s/%s[%s]: %s' % (message.guild, message.channel, message.author, message.content.encode('utf-8')))
 
         if self._realboi and int(message.author.id) == lennys_id:
             message_content = message.content
             channel = message.channel
             tts = message.tts
-            await self.delete_message(message)
-            await self.send_message(channel, message_content, tts=tts)
+            await message.delete()
+            await channel.send(message_content, tts=tts)
 
         elif message.content[0] == '!':
             command = shlex.split(message.content)
@@ -99,8 +111,8 @@ class LennyBot(discord.Client):
             # !channels [server_filter]
             elif message.content.startswith('!channels'):
                 await self.say_channels(message, message.channel, ' '.join(command[1:]))
-            elif message.content.startswith('!private-channels'):
-                await self.print_private_channels(message)
+            # elif message.content.startswith('!private-channels'):
+            #     await self.print_private_channels(message)
 
             # !say server channel message
             elif message.content.startswith('!say'):
@@ -128,51 +140,53 @@ class LennyBot(discord.Client):
                 i = self._find_dadjokable(message)
                 if i >= 0:
                     dadjoke = self._calc_dadjoke(message, i)
-                    await self.send_message(message.channel, dadjoke, tts=message.tts)
+                    await message.channel.send(dadjoke, tts=message.tts)
 
-    async def hi_im_lenny(self, message):
-        await self.send_message(message.channel, 'Hello, I\'m the real Lenny!', tts=message.tts)
+    async def hi_im_lenny(self, context):
+        await context.channel.send('Hello, I\'m the real Lenny!', tts=context.tts)
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
-        target = await self.get_message(self.find_channel(server, channel), message_id)
+        target = await self.find_message(server, channel, message_id)
         for char in reactions.lower():
-            await self.add_reaction(target, a_to_emoji(char))
+            await target.add_reaction(a_to_emoji(char))
 
     @authenticate
     async def clear_emojiate(self, context, server, channel, message_id):
-        target = await self.get_message(self.find_channel(server, channel), message_id)
-        await self.clear_reactions(target)
+        target = await self.find_message(server, channel, message_id)
+        await target.clear_reactions()
 
     @authenticate
     async def say(self, context, server, channel, message, tts=False):
-        await self.send_message(self.find_channel(server, channel), message, tts=tts)
+        await self.find_channel(server, channel).send(message, tts=tts)
 
     @authenticate
     async def emojify(self, context, message):
+        # TODO: put space between each character here so it doesn't combine emojis
         logger.info(message)
-        await self.send_message(context.channel, str_to_emoji(message))
+        await context.channel.send(str_to_emoji(message))
 
     @authenticate
     async def say_channels(self, context, channel, server_filter=None):
-        ##TODO: allow for regex server_filter?
+        # TODO: allow for regex server_filter?
         if server_filter:
-            await self.send_message(channel, list(self.channels_as_dict()[server_filter].keys()))
+            await context.channel.send(list(self.channels_as_dict()[server_filter].keys()))
         else:
-            await self.send_message(channel, str(dict((server, list(channels.keys())) for server, channels in self.channels_as_dict().items())))
+            await context.channel.send(str(dict((server, list(channels.keys())) for server, channels in self.channels_as_dict().items())))
 
-    @authenticate
-    async def print_private_channels(self, context):
-        await self.send_message(list(self.private_channels)[0], 'lennybot online')
-        logger.info('private channels %s' % len(self.private_channels))
-        await self.send_message(context.channel, [list(map(lambda x: x.name, channel.recipients)) for channel in self.private_channels])
-        # await self.send_message(message.channel, [channel.id for channel in self.private_channels])
+    # self.private_channels is []. Not sure what this is for anymore
+    # @authenticate
+    # async def print_private_channels(self, context):
+    #     await list(self.private_channels)[0].send('lennybot online')
+    #     logger.info('private channels %s' % len(self.private_channels))
+    #     await context.channel.send([list(map(lambda x: x.name, channel.recipients)) for channel in self.private_channels])
+    #     # await self.send_message(message.channel, [channel.id for channel in self.private_channels])
 
     @authenticate
     async def message_squaar(self, context, message):
         for member in self.get_all_members():
-            if int(member.id) == 135265595925987328:
-                await self.send_message(member, message)
+            if int(member.id) == squaars_id:
+                await member.send(message)
                 return
 
     @authenticate
@@ -190,7 +204,7 @@ class LennyBot(discord.Client):
         elif (type(state) == str and state.lower() == 'off') or state is False:
             self._dadmode = False
         else:
-            log.warn('Unrecognized state for dadmode: %s' % state)
+            logger.warning('Unrecognized state for dadmode: %s' % state)
         logger.info('Dad mode: %s' % self._dadmode)
 
     @authenticate
@@ -200,7 +214,7 @@ class LennyBot(discord.Client):
         elif (type(state) == str and state.lower() == 'off') or state is False:
             self._hi_im_lenny = False
         else:
-            log.warn('Unrecognized state for hi_im_lenny_mode: %s' % state)
+            logger.warning('Unrecognized state for hi_im_lenny_mode: %s' % state)
         logger.info('hi_im_lenny mode: %s' % self._hi_im_lenny)
 
     # TODO: could use regex?
@@ -212,7 +226,7 @@ class LennyBot(discord.Client):
             if message.content.find(trigger) == 0:
                 return len(trigger)
             elif ' ' + trigger in message.content:
-                return message.content.find(' ' + trigger) + len(trigger) + 1 # for the space
+                return message.content.find(' ' + trigger) + len(trigger) + 1  # for the space
         return -1
 
     ##TODO: implement dadjokes
