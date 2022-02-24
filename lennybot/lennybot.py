@@ -3,7 +3,7 @@ import logging
 import shlex
 import werkzeug
 from functools import wraps
-from . import resources
+from .resources import RESOURCE_DICTIONARY
 import asyncio  # need to import this for threading
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
@@ -175,11 +175,11 @@ class LennyBot(discord.Client):
         if not self.voice_connected():
             await context.channel.send('Not connected to voice channel.')
             return
-        resource_path = resources.find_resource(resource_name)
-        if not resource_path:
+        resource = RESOURCE_DICTIONARY.find_resource(resource_name)
+        if not resource:
             await context.channel.send(f'Could\'t find audio {resource_name}.')
             return
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource_path))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource.path))
         self._voice_client.play(source, after=lambda e: f'Audio error: {e}')
         await context.channel.send(f'Playing {resource_name}.')
 
