@@ -1,8 +1,9 @@
-from functools import wraps
 import discord
 import logging
 import shlex
 import werkzeug
+from functools import wraps
+from . import resources
 import asyncio  # need to import this for threading
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
@@ -42,6 +43,7 @@ class LennyBot(discord.Client):
         self._realboi = True
         self._dadmode = True
         self._hi_im_lenny = True
+        self._voice_client = None
 
     def find_channel(self, server_name, channel_name):
         for server in self.guilds:
@@ -74,13 +76,26 @@ class LennyBot(discord.Client):
             d[channel.guild.name][channel.name] = channel
         return d
 
+    def voice_connected(self):
+        return self._voice_client and self._voice_client.is_connected()
+
+    async def connect_voice(self, server, channel):
+        channel = self.find_channel(server, channel)
+        self._voice_client = await channel.connect()
+
+    async def disconnect_voice(self):
+        if self.voice_connected():
+            await self._voice_client.disconnect()
+
     async def on_ready(self):
         logger.info('Lennybot logged in: %s, %s' % (self.user.name, self.user.id))
         try:
-            lenny_land = self.find_channel('Game Bois', 'Lenny land')
-            await lenny_land.connect()
+            # lenny_land = self.find_channel('Game Bois', 'Lenny land')
+            # await lenny_land.connect()
+            # await self.connect_voice('Game Bois', 'Lenny land')
+            await self.connect_voice('Game Bois', 'Bot Testing')
         except RuntimeError as e:
-            logger.warning(e)
+            logger.exception(e)
 
     ##TODO: private messaging
     async def on_message(self, message):
@@ -132,6 +147,12 @@ class LennyBot(discord.Client):
             elif message.content.startswith('!hi_im_lenny'):
                 self.hi_im_lenny_mode(message, command[1])
 
+            elif message.content.startswith('!playaudio'):
+                await self.play_audio(message, command[1])
+
+            elif message.content.startswith('!stopaudio'):
+                self.stop_audio(message)
+
         else:
             if self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
                 await self.hi_im_lenny(message)
@@ -144,6 +165,23 @@ class LennyBot(discord.Client):
 
     async def hi_im_lenny(self, context):
         await context.channel.send('Hello, I\'m the real Lenny!', tts=context.tts)
+
+    def stop_audio(self, context):
+        if self.voice_connected() and self._voice_client.is_playing():
+            self._voice_client.stop()
+
+    @authenticate
+    async def play_audio(self, context, resource_name):
+        if not self.voice_connected():
+            await context.channel.send('Not connected to voice channel.')
+            return
+        resource_path = resources.find_resource(resource_name)
+        if not resource_path:
+            await context.channel.send(f'Could\'t find audio {resource_name}.')
+            return
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource_path))
+        self._voice_client.play(source, after=lambda e: f'Audio error: {e}')
+        await context.channel.send(f'Playing {resource_name}.')
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
