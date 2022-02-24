@@ -1,0 +1,6 @@
+{
+  "audio": {
+    "VOXFULL": "resources/audio/raw/VOX_FULL.mp3",
+    "voxintro": "resources/audio/voxintro.mp3"
+  }
+}
