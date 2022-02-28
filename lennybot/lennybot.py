@@ -92,10 +92,8 @@ class LennyBot(discord.Client):
     async def on_ready(self):
         logger.info('Lennybot logged in: %s, %s' % (self.user.name, self.user.id))
         try:
-            # lenny_land = self.find_channel('Game Bois', 'Lenny land')
-            # await lenny_land.connect()
-            # await self.connect_voice('Game Bois', 'Lenny land')
-            await self.connect_voice('Game Bois', 'Bot Testing')
+            await self.connect_voice('Game Bois', 'Lenny land')
+            # await self.connect_voice('Game Bois', 'Bot Testing')
         except RuntimeError as e:
             logger.exception(e)
 
