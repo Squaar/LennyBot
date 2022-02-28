@@ -2,6 +2,7 @@ import discord
 import logging
 import shlex
 import werkzeug
+import queue
 from functools import wraps
 from .resources import RESOURCE_DICTIONARY
 import asyncio  # need to import this for threading
@@ -44,6 +45,8 @@ class LennyBot(discord.Client):
         self._dadmode = True
         self._hi_im_lenny = True
         self._voice_client = None
+        self._audio_queue = asyncio.Queue()
+        self._audio_task = None
 
     def find_channel(self, server_name, channel_name):
         for server in self.guilds:
@@ -92,8 +95,8 @@ class LennyBot(discord.Client):
         try:
             # lenny_land = self.find_channel('Game Bois', 'Lenny land')
             # await lenny_land.connect()
-            await self.connect_voice('Game Bois', 'Lenny land')
-            # await self.connect_voice('Game Bois', 'Bot Testing')
+            # await self.connect_voice('Game Bois', 'Lenny land')
+            await self.connect_voice('Game Bois', 'Bot Testing')
         except RuntimeError as e:
             logger.exception(e)
 
@@ -153,6 +156,9 @@ class LennyBot(discord.Client):
             elif message.content.startswith('!stopaudio'):
                 self.stop_audio(message)
 
+            elif message.content.startswith('!vox'):
+                await self.vox(message, command[1])
+
         else:
             if self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
                 await self.hi_im_lenny(message)
@@ -166,9 +172,56 @@ class LennyBot(discord.Client):
     async def hi_im_lenny(self, context):
         await context.channel.send('Hello, I\'m the real Lenny!', tts=context.tts)
 
-    def stop_audio(self, context):
+    async def clear_audio_queue(self):
+        for i in range(self._audio_queue.qsize()):
+            await self._audio_queue.get()
+
+    async def stop_audio(self, context):
+        if self._audio_task:
+            self._audio_task.cancel()
+            await asyncio.gather(self._audio_task, return_exceptions=True)
+        await self.clear_audio_queue()
         if self.voice_connected() and self._voice_client.is_playing():
             self._voice_client.stop()
+
+    async def play_resource(self, context, resource, after=None):
+        logger.info(f'Play resource {resource}')
+        if after is None:
+            after = lambda e: f'Audio error: {e}'
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource.path))
+        self._voice_client.play(source, after=after)
+        await context.channel.send(f'Playing {resource.name}.')
+
+    async def play_resources(self, context, resources):
+        # if resources:
+        #     resource = resources.pop(0)
+        #     async def after(error):
+        #         if error:
+        #             logger.error(error)
+        #         else:
+        #             await self.play_resources(context, resources)
+        #     await self.play_resource(context, resource, after=after)
+
+
+
+        async def worker():
+            def after(e):
+                if e:
+                    logger.error(e)
+                logger.info(f'After')
+                self._audio_queue.task_done()
+
+            while True:
+                resource = await self._audio_queue.get()
+                logger.info(f'Worker working {resource}')
+                await self.play_resource(context, resource, after=after)
+
+        await self.stop_audio(context)
+        self._audio_task = asyncio.create_task(worker())
+        for resource in resources:
+            await self._audio_queue.put(resource)
+            await self._audio_queue.join()
+
 
     @authenticate
     async def play_audio(self, context, resource_name):
@@ -179,9 +232,20 @@ class LennyBot(discord.Client):
         if not resource:
             await context.channel.send(f'Could\'t find audio {resource_name}.')
             return
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource.path))
-        self._voice_client.play(source, after=lambda e: f'Audio error: {e}')
-        await context.channel.send(f'Playing {resource_name}.')
+        await self.play_resource(context, resource)
+
+    @authenticate
+    async def vox(self, context, sentence):
+        words = [word.lower() for word in sentence.split()]
+        resources = [RESOURCE_DICTIONARY.find_resource(word) for word in words]
+        not_found = [word for i, word in enumerate(words) if not resources[i]]
+        if not_found:
+            await context.channel.send(f'Couldn\t find vox audio {not_found}')
+            return
+        await self.play_resources(context, resources)
+        # for resource in resources:
+        #     await self.play_resource(context, resource)
+
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
