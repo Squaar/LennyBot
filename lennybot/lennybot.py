@@ -2,7 +2,6 @@ import discord
 import logging
 import shlex
 import werkzeug
-import queue
 from functools import wraps
 from .resources import RESOURCE_DICTIONARY
 import asyncio  # need to import this for threading
@@ -154,7 +153,7 @@ class LennyBot(discord.Client):
                 await self.play_audio(message, command[1])
 
             elif message.content.startswith('!stopaudio'):
-                self.stop_audio(message)
+                await self.stop_audio(message)
 
             elif message.content.startswith('!vox'):
                 await self.vox(message, command[1])
@@ -190,38 +189,31 @@ class LennyBot(discord.Client):
             after = lambda e: f'Audio error: {e}'
         source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource.path))
         self._voice_client.play(source, after=after)
-        await context.channel.send(f'Playing {resource.name}.')
+        # await context.channel.send(f'Playing {resource.name}.')
 
     async def play_resources(self, context, resources):
-        # if resources:
-        #     resource = resources.pop(0)
-        #     async def after(error):
-        #         if error:
-        #             logger.error(error)
-        #         else:
-        #             await self.play_resources(context, resources)
-        #     await self.play_resource(context, resource, after=after)
-
-
-
         async def worker():
+            ready = True
             def after(e):
                 if e:
                     logger.error(e)
-                logger.info(f'After')
+                nonlocal ready
+                ready = True
                 self._audio_queue.task_done()
 
             while True:
+                if not ready:
+                    await asyncio.sleep(0)  # let the loop run
+                    continue
                 resource = await self._audio_queue.get()
-                logger.info(f'Worker working {resource}')
                 await self.play_resource(context, resource, after=after)
+                ready = False
 
         await self.stop_audio(context)
         self._audio_task = asyncio.create_task(worker())
         for resource in resources:
             await self._audio_queue.put(resource)
-            await self._audio_queue.join()
-
+        await self._audio_queue.join()
 
     @authenticate
     async def play_audio(self, context, resource_name):
