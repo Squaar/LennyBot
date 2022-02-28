@@ -1,10 +1,13 @@
+import argparse
+
 import discord
 import logging
 import shlex
 import werkzeug
+import asyncio  # need to import this for threading
 from functools import wraps
 from .resources import RESOURCE_DICTIONARY
-import asyncio  # need to import this for threading
+from . import message_parser
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
 logger = logging.getLogger(__name__)
@@ -22,21 +25,28 @@ squaars_id = 135265595925987328
 ##TODO: watch for lenny in voice channels and follow
 
 
-##TODO: this could be done smarter
 def authenticate(func):
     @wraps(func)
     def with_authentication(*args, **kwargs):
-        ##TODO: throw this in a big ol' or
-        if len(args) > 0 and type(args[1]) == discord.message.Message and int(args[1].author.id) in authorized_users:
-            return func(*args, **kwargs)
-        elif len(args) > 0 and type(args[1]) == werkzeug.local.LocalProxy and int(args[1]['user_id']) in authorized_users:
+        user_id = None
+        if len(args) >= 2:
+            self = args[0]
+            if isinstance(args[1], argparse.Namespace):
+                user_id = int(args[1].message.author.id)
+            elif isinstance(args[1], discord.message.Message):
+                user_id = int(args[1].author.id)
+            elif isinstance(args[1], werkzeug.local.LocalProxy):
+                user_id = int(args[1]['user_id'])
+        if not user_id:
+            raise AuthenticationError('Couldn\'t authenticate: %s; %s; %s' % (func.__name__, args, kwargs), func)
+        if user_id in authorized_users:
             return func(*args, **kwargs)
         else:
-            raise AuthenticationError('Couldn\'t authenticate: %s; %s; %s' % (func.__name__, args, kwargs), func)
+            raise AuthenticationError(f'{user_id} not authorized!')
     return with_authentication
 
 
-class LennyBot(discord.Client):
+class LennyBot(message_parser.MessageParseMixin, discord.Client):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,6 +56,7 @@ class LennyBot(discord.Client):
         self._voice_client = None
         self._audio_queue = asyncio.Queue()
         self._audio_task = None
+        self._join_voice = kwargs.get('join_voice', True)  ##TODO: change this to str arg and join the given channel, add to argparse
 
     def find_channel(self, server_name, channel_name):
         for server in self.guilds:
@@ -91,15 +102,20 @@ class LennyBot(discord.Client):
 
     async def on_ready(self):
         logger.info('Lennybot logged in: %s, %s' % (self.user.name, self.user.id))
-        try:
-            await self.connect_voice('Game Bois', 'Lenny land')
-            # await self.connect_voice('Game Bois', 'Bot Testing')
-        except RuntimeError as e:
-            logger.exception(e)
+        if self._join_voice:
+            try:
+                # await self.connect_voice('Game Bois', 'Lenny land')
+                await self.connect_voice('Game Bois', 'Bot Testing')
+            except RuntimeError as e:
+                logger.exception(e)
 
-    ##TODO: private messaging
+
     async def on_message(self, message):
         logger.info('%s/%s[%s]: %s' % (message.guild, message.channel, message.author, message.content.encode('utf-8')))
+        try:
+            return await super().on_message(message)
+        except argparse.ArgumentError as e:
+            pass
 
         if self._realboi and int(message.author.id) == lennys_id:
             message_content = message.content
@@ -153,8 +169,8 @@ class LennyBot(discord.Client):
             elif message.content.startswith('!stopaudio'):
                 await self.stop_audio(message)
 
-            elif message.content.startswith('!vox'):
-                await self.vox(message, command[1])
+            elif message.content.startswith('!_vox'):
+                await self._vox(message, command[1])
 
         else:
             if self._hi_im_lenny and 'lenny' in message.content.lower() and message.author != self.user:
@@ -225,7 +241,7 @@ class LennyBot(discord.Client):
         await self.play_resource(context, resource)
 
     @authenticate
-    async def vox(self, context, sentence):
+    async def _vox(self, context, sentence):
         words = [word.lower() for word in sentence.split()]
         resources = [RESOURCE_DICTIONARY.find_resource(word) for word in words]
         not_found = [word for i, word in enumerate(words) if not resources[i]]
@@ -233,9 +249,17 @@ class LennyBot(discord.Client):
             await context.channel.send(f'Couldn\t find vox audio {not_found}')
             return
         await self.play_resources(context, resources)
-        # for resource in resources:
-        #     await self.play_resource(context, resource)
 
+    @authenticate
+    async def vox(self, command):
+        ##TODO: implement channel switch
+        words = command.words
+        resources = [RESOURCE_DICTIONARY.find_resource(word) for word in words]
+        not_found = [word for i, word in enumerate(words) if not resources[i]]
+        if not_found:
+            await command.message.channel.send(f'Couldn\'t find vox audio {not_found}')
+            return
+        await self.play_resources(command.message, resources)
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):
