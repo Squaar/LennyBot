@@ -124,7 +124,7 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
             await message.delete()
             await channel.send(message_content, tts=tts)
 
-        elif message.content[0] == '!':
+        elif message.content and message.content[0] == '!':
             command = shlex.split(message.content)
 
             # !emojiate server channel message_id reactions
