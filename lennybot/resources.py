@@ -1,6 +1,6 @@
-import json
 import os
 import logging
+import discord
 from . import utils
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
@@ -18,14 +18,24 @@ def _strip_resource_dir(path):
     return path
 
 class Resource:
-    def __init__(self, name, path, alt_names=None, description=None):
+    def __init__(self, name, alt_names=None, description=None):
         self.name = name
-        self._path = path
         self.alt_names = alt_names or tuple()
         self.description = description
 
     def __repr__(self):
-        return f'<Resource {self.name}@{self._path}>'
+        return f'<Resource {self.name}>'
+
+    def getAudioSource(self, *args, **kwargs):
+        raise RuntimeError(f'Can\'t get AudioSource for vanilla Resource: {self}')
+
+class LocalResource(Resource):
+    def __init__(self, name, path, alt_names=None, description=None):
+        super().__init__(name, alt_names=alt_names, description=description)
+        self._path = path
+
+    def __repr__(self):
+        return f'<LocalResource {self.name}@{self._path}>'
 
     @property
     def path(self):
@@ -36,10 +46,13 @@ class Resource:
         _validate_path(path)
         return path
 
+    def getAudioSource(self, *args, **kwargs):
+        return discord.FFmpegPCMAudio(self.path)
+
 class ResourceDictionary:
     resources = [
-        Resource('voxfull', 'audio/raw/VOX_FULL.mp3', ('vox_full',), 'Full HL1 VOX announcer mp3'),
-        Resource('voxintro', 'audio/voxintro.mp3', ('vox_intro'), 'VOX intro song 00:00:00'),
+        LocalResource('voxfull', 'audio/raw/VOX_FULL.mp3', ('vox_full',), 'Full HL1 VOX announcer mp3'),
+        LocalResource('voxintro', 'audio/voxintro.mp3', ('vox_intro'), 'VOX intro song 00:00:00'),
     ]
 
     _translation_rules = (
@@ -90,7 +103,7 @@ class ResourceDictionary:
                         name = os.path.splitext(filename)[0]
                         path = _strip_resource_dir(filepath)
                         description = path
-                        self.add_resource(Resource(name, path, description=description))
+                        self.add_resource(LocalResource(name, path, description=description))
                         logger.info(f'Added resource to dictionary {name}: {filepath}')
                 else:
                     logger.info(f'Found existing resource {resource.name} at {filepath}')
@@ -102,4 +115,4 @@ if __name__ == '__main__':
     from pprint import pprint
     # pprint(get_all_resources())
     # print(ResourceDictionary.find_resource('voxintro').path)
-    print(Resource('', './123/abc').path)
+    print(LocalResource('', './123/abc').path)

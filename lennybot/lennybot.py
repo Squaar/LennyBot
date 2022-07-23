@@ -197,11 +197,11 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         if self.voice_connected() and self._voice_client.is_playing():
             self._voice_client.stop()
 
-    async def play_resource(self, context, resource, after=None):
+    async def play_resource(self, context, resource, volume=None, after=None):
         logger.info(f'Play resource {resource}')
         if after is None:
             after = lambda e: f'Audio error: {e}'
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(resource.path))
+        source = discord.PCMVolumeTransformer(resource.getAudioSource(*context.args, **context.kwargs))
         self._voice_client.play(source, after=after)
         # await context.channel.send(f'Playing {resource.name}.')
 
