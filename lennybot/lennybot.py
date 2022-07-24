@@ -7,6 +7,7 @@ import werkzeug
 import asyncio  # need to import this for threading
 from functools import wraps
 from .resources import RESOURCE_DICTIONARY
+from .fifteenai import FifteenAIClient
 from . import message_parser
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
@@ -112,10 +113,8 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
 
     async def on_message(self, message):
         logger.info('%s/%s[%s]: %s' % (message.guild, message.channel, message.author, message.content.encode('utf-8')))
-        try:
-            return await super().on_message(message)
-        except argparse.ArgumentError as e:
-            pass
+        if message.author == self.user:
+            return
 
         if self._realboi and int(message.author.id) == lennys_id:
             message_content = message.content
@@ -125,6 +124,11 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
             await channel.send(message_content, tts=tts)
 
         elif message.content and message.content[0] == '!':
+            try:
+                return await super().on_message(message)
+            except argparse.ArgumentError as e:
+                pass
+
             command = shlex.split(message.content)
 
             # !emojiate server channel message_id reactions
@@ -164,7 +168,7 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
                 self.hi_im_lenny_mode(message, command[1])
 
             elif message.content.startswith('!playaudio'):
-                await self.play_audio(message, command[1])
+                await self.play_resource_by_name(message, command[1])
 
             elif message.content.startswith('!stopaudio'):
                 await self.stop_audio(message)
@@ -201,7 +205,8 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         logger.info(f'Play resource {resource}')
         if after is None:
             after = lambda e: f'Audio error: {e}'
-        source = discord.PCMVolumeTransformer(resource.getAudioSource(*context.args, **context.kwargs))
+        source = resource.getAudioSource()
+        source = discord.PCMVolumeTransformer(source)
         self._voice_client.play(source, after=after)
         # await context.channel.send(f'Playing {resource.name}.')
 
@@ -230,7 +235,7 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         await self._audio_queue.join()
 
     @authenticate
-    async def play_audio(self, context, resource_name):
+    async def play_resource_by_name(self, context, resource_name):
         if not self.voice_connected():
             await context.channel.send('Not connected to voice channel.')
             return
@@ -253,13 +258,29 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
     @authenticate
     async def vox(self, command):
         ##TODO: implement channel switch
-        words = command.words
+        words = [word.lower() for word in command.words]
         resources = [RESOURCE_DICTIONARY.find_resource(word) for word in words]
         not_found = [word for i, word in enumerate(words) if not resources[i]]
         if not_found:
             await command.message.channel.send(f'Couldn\'t find vox audio {not_found}')
             return
         await self.play_resources(command.message, resources)
+
+    @authenticate
+    async def fifteenai(self, command):
+        if command.list_characters:
+            characters = FifteenAIClient.getCharacters()
+            await command.message.channel.send(', '.join(characters))  ##TODO: could do some fancy formatting here
+            return
+        text = ' '.join(command.text) if isinstance(command.text, (list, tuple)) else command.text
+        character = command.character
+        availableCharacters = FifteenAIClient.getCharacters()
+        if character not in availableCharacters:
+            for availableCharacter in availableCharacters:
+                if character.lower() == availableCharacter.lower():
+                    character = availableCharacter
+        resource = FifteenAIClient(text, character, emotion=command.emotion)
+        await self.play_resources(command, [resource])
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):

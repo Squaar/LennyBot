@@ -7,6 +7,7 @@ import asyncio
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 class LennyMessageParser(argparse.ArgumentParser):
     def __init__(self, *args, funcname=None, func=None, **kwargs):
@@ -22,8 +23,10 @@ class LennyMessageParser(argparse.ArgumentParser):
             args = shlex.split(message)
         else:
             raise TypeError(f'message is {type(message)}. Expected discord.Message or str')
+        log.debug(f'parse_args: {args}')
         ret = self.parse_args(args)
         ret.message = message
+        log.debug(f'arg namespace: {ret}')
         return ret
 
     def error(self, message):
@@ -50,7 +53,16 @@ class MessageParseMixin:
         vox_parser = self._subparsers.add_parser('!vox', funcname='vox')
         vox_parser.add_argument('--channel', '-c', nargs='?', default=None, const='__SENDER__',
                                 help='Automatically switch to the given Server/Channel or the sender\'s channel and back.')
-        vox_parser.add_argument('words', nargs='*')
+        vox_parser.add_argument('words', nargs='+')
+
+        fifteenai_parser = self._subparsers.add_parser('!fifteenai', funcname='fifteenai')
+        fifteenai_parser.add_argument('--channel', '-c', nargs='?', default=None, const='__SENDER__',
+                                help='Automatically switch to the given Server/Channel or the sender\'s channel and back.')
+        fifteenai_parser.add_argument('--list-characters', action='store_true',
+                                      help='List characters available and exit.')
+        fifteenai_parser.add_argument('--character', '-a', help='The character\'s voice to use.')
+        fifteenai_parser.add_argument('--emotion', '-e', default='Contextual', help='The emotion to use.')
+        fifteenai_parser.add_argument('text', nargs='*', help='What to say')
 
         for name, parser in self._subparsers.choices.items():
             if parser.funcname:
