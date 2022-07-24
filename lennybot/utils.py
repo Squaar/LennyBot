@@ -43,5 +43,13 @@ async def runInExecutor(fn, *args, **kwargs):
     return ret
 
 
-def getIP():
-    pass
+async def getIP():
+    resp = await runInExecutor(requests.get, 'https://api.ipify.org?format=json')
+    checkResponse(resp)
+    return resp.json()['ip']
+
+
+def checkResponse(resp):
+    log.debug(str(resp))
+    if not 200 <= resp.status_code < 300:
+        raise RuntimeError(resp.text)

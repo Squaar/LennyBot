@@ -6,7 +6,7 @@ import logging
 import tempfile
 from io import BytesIO
 from .resources import Resource
-from .utils import Timer, runInExecutor
+from .utils import Timer, runInExecutor, checkResponse
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -50,11 +50,6 @@ class FifteenAIClient(Resource):
             self._wavNames = await self._submitRequest()
         return self._wavNames
 
-    def _checkResponse(self, resp):
-        log.debug(str(resp))
-        if not 200 <= resp.status_code < 300:
-            raise RuntimeError(resp.text)
-
     def _getHeaders(self, headerDict=None):
         headerDict = headerDict or {}
         return self._BASE_HEADERS.update(headerDict)
@@ -73,7 +68,7 @@ class FifteenAIClient(Resource):
         log.debug('Generating Wavs, this may take a moment.')
         with Timer('Time to generate Wavs', log.info):
             resp = await runInExecutor(requests.post, url, data=payload, headers=headers)
-        self._checkResponse(resp)
+        self.checkResponse(resp)
         if not resp.json().get('wavNames'):
             raise RuntimeError(f'No wavNames returned from 15.ai')
         wavNames = resp.json()['wavNames']
@@ -88,7 +83,7 @@ class FifteenAIClient(Resource):
         log.debug(f'Downloading wav {wavName} this may take a moment.')
         with Timer(f'Time to get Wav {wavName}', log.info):
             resp = await runInExecutor(requests.get, url, headers=headers)
-        self._checkResponse(resp)
+        self.checkResponse(resp)
         self._wavs[wavName] = resp.content
         return self._wavs[wavName]
 

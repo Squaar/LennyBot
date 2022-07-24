@@ -120,7 +120,7 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
                 await self.connect_voice('Game Bois', 'Bot Testing')
             except RuntimeError as e:
                 logger.exception(e)
-        await self.message_squaar(LennyInitiatedContext(), f'Lennybot logged in {getIP()}')
+        await self.message_squaar(LennyInitiatedContext(), f'Lennybot logged in @ {await getIP()}')
 
     async def on_message(self, message):
         logger.info('%s/%s[%s]: %s' % (message.guild, message.channel, message.author, message.content.encode('utf-8')))
