@@ -205,10 +205,13 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         logger.info(f'Play resource {resource}')
         if after is None:
             after = lambda e: f'Audio error: {e}'
-        source = resource.getAudioSource()
-        source = discord.PCMVolumeTransformer(source)
-        self._voice_client.play(source, after=after)
-        # await context.channel.send(f'Playing {resource.name}.')
+        try:
+            source = resource.getAudioSource()
+            source = discord.PCMVolumeTransformer(source)
+            self._voice_client.play(source, after=after)
+            # await context.channel.send(f'Playing {resource.name}.')
+        except Exception as exc:
+            await context.channel.send(str(exc))
 
     async def play_resources(self, context, resources):
         async def worker():
@@ -274,13 +277,11 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
             return
         text = ' '.join(command.text) if isinstance(command.text, (list, tuple)) else command.text
         character = command.character
-        availableCharacters = FifteenAIClient.getCharacters()
-        if character not in availableCharacters:
-            for availableCharacter in availableCharacters:
-                if character.lower() == availableCharacter.lower():
-                    character = availableCharacter
-        resource = FifteenAIClient(text, character, emotion=command.emotion)
-        await self.play_resources(command, [resource])
+        try:
+            resource = FifteenAIClient(text, character, emotion=command.emotion)
+            await self.play_resources(command.message, [resource])
+        except Exception as exc:
+            await command.message.channel.send(str(exc))
 
     @authenticate
     async def emojiate(self, context, server, channel, message_id, reactions):

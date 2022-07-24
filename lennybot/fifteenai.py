@@ -21,7 +21,7 @@ class FifteenAIClient(Resource):
     def __init__(self, text, character, emotion='Contextual'):
         super().__init__(f'FIFTEENAI__{character}__{text}')
         self.text = text
-        self.character = character
+        self.character = self._fuzzyMatchCharacter(character)
         self.emotion = emotion
         self._wavNames = []
         self._wavs = {}
@@ -88,6 +88,17 @@ class FifteenAIClient(Resource):
         self._wavs[wavName] = resp.content
         return self._wavs[wavName]
 
+    def _fuzzyMatchCharacter(self, character):
+        availableCharacters = self.getCharacters()
+        if character not in availableCharacters:
+            for availableCharacter in availableCharacters:
+                if character.lower() == availableCharacter.lower():
+                    return availableCharacter
+        for availableCharacter, aliases in self.getAliases().items():
+            if character.lower() in list(map(lambda alias: alias.lower(), aliases)):
+                return availableCharacter
+        return character
+
     @classmethod
     def getCharacters(cls):
         return list(itertools.chain.from_iterable(cls.getCharactersBySource().values()))
@@ -132,6 +143,13 @@ class FifteenAIClient(Resource):
             'Undertale': [
                 'Sans',
             ],
+        }
+
+    @classmethod
+    def getAliases(cls):
+        return {
+            'SpongeBob SquarePants': ['spongebob', 'sb'],
+            'Carl Brutananadilewski': ['carl'],
         }
 
 def main():
