@@ -25,7 +25,9 @@ class LennyMessageParser(argparse.ArgumentParser):
             raise TypeError(f'message is {type(message)}. Expected discord.Message or str')
         log.debug(f'parse_args: {args}')
         ret = self.parse_args(args)
+        ret.args = args
         ret.message = message
+        ret.help = any([arg in args for arg in ('-h', '--help')])
         log.debug(f'arg namespace: {ret}')
         return ret
 
@@ -34,12 +36,6 @@ class LennyMessageParser(argparse.ArgumentParser):
 
     def exit(self, status=0, message=None):
         log.debug(f'Message parse exit status {status}: {message}')
-
-    # def parse_args(self, *args, **kwargs):
-    #     try:
-    #         return super().parse_args(*args, **kwargs)
-    #     except argparse.ArgumentError as e:
-    #         return e
 
 
 class MessageParseMixin:
@@ -73,15 +69,23 @@ class MessageParseMixin:
 
     async def on_message(self, message):
         command = self._message_parser.parse_message(message)
-        if hasattr(command, 'func'):
+        if hasattr(command, 'help') and command.help:
+            await self.helpForSubprocessor(command, self._subprocessorForCommand(command))
+        elif hasattr(command, 'func'):
             await command.func(command)
 
     async def help(self, command):
+        return await self.helpForSubprocessor(command, self._message_parser)
+
+    async def helpForSubprocessor(self, command, subprocessor):
         f = io.StringIO()
-        self._message_parser.print_help(file=f)
+        f.write('\n')
+        subprocessor.print_help(file=f)
         f.seek(0)
         await command.message.channel.send(f.read())
 
+    def _subprocessorForCommand(self, command):
+        return self._subparsers._name_parser_map.get(command.args[0])
 
 class MockMessage(discord.Message):
     def __init__(self, content):
