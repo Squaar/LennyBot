@@ -26,7 +26,7 @@ class Resource:
     def __repr__(self):
         return f'<Resource {self.name}>'
 
-    def getAudioSource(self, *args, **kwargs):
+    async def getAudioSource(self, *args, **kwargs):
         raise RuntimeError(f'Can\'t get AudioSource for vanilla Resource: {self}')
 
 class LocalResource(Resource):
@@ -46,7 +46,7 @@ class LocalResource(Resource):
         _validate_path(path)
         return path
 
-    def getAudioSource(self, *args, **kwargs):
+    async def getAudioSource(self, *args, **kwargs):
         return discord.FFmpegPCMAudio(self.path)
 
 class ResourceDictionary:

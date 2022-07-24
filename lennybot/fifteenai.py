@@ -6,7 +6,7 @@ import logging
 import tempfile
 from io import BytesIO
 from .resources import Resource
-from .utils import Timer
+from .utils import Timer, runInExecutor
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -19,31 +19,35 @@ class FifteenAIClient(Resource):
     }
 
     def __init__(self, text, character, emotion='Contextual'):
-        super().__init__(f'FIFTEENAI__{character}__{text}')
+        super().__init__(self._getResourceName(text, character, emotion))
         self.text = text
         self.character = self._fuzzyMatchCharacter(character)
         self.emotion = emotion
         self._wavNames = []
         self._wavs = {}
 
-    def getAudioSource(self, i=0):
+    @classmethod
+    def _getResourceName(cls, text, character, emotion):
+        return f'FIFTEENAI__{character}__{text}__{emotion}'
+
+    async def getAudioSource(self, i=0):
         # byteStream = BytesIO(self.getIthWav(i))
         # byteStream.seek(0)
         # audioSource = discord.FFmpegPCMAudio(byteStream, pipe=True)
 
         with tempfile.TemporaryFile() as f:
-            f.write(self.getIthWav(i))
+            f.write(await self.getIthWav(i))
             f.seek(0)
             audioSource = discord.FFmpegPCMAudio(f, pipe=True)
 
         return audioSource
 
-    def getIthWav(self, i):
-        return self._getWav(self.getWavNames()[i])
+    async def getIthWav(self, i):
+        return await self._getWav((await self.getWavNames())[i])
 
-    def getWavNames(self):
+    async def getWavNames(self):
         if not self._wavNames:
-            self._wavNames = self._submitRequest()
+            self._wavNames = await self._submitRequest()
         return self._wavNames
 
     def _checkResponse(self, resp):
@@ -59,7 +63,7 @@ class FifteenAIClient(Resource):
     #     wavNames = self.submitRequest(text, character, emotion=emotion)
     #     return self.getWav(wavNames[i])
 
-    def _submitRequest(self):
+    async def _submitRequest(self):
         url = urllib.parse.urljoin(self._API_ROOT_URL, '/app/getAudioFile5')
         payload = {'text': self.text, 'character': self.character, 'emotion': self.emotion}
         headers = self._getHeaders({
@@ -68,7 +72,7 @@ class FifteenAIClient(Resource):
         })
         log.debug('Generating Wavs, this may take a moment.')
         with Timer('Time to generate Wavs', log.info):
-            resp = requests.post(url, data=payload)  ##TODO: this should be async
+            resp = await runInExecutor(requests.post, url, data=payload, headers=headers)
         self._checkResponse(resp)
         if not resp.json().get('wavNames'):
             raise RuntimeError(f'No wavNames returned from 15.ai')
@@ -76,14 +80,14 @@ class FifteenAIClient(Resource):
         log.debug(f'Got wavNames: {wavNames}')
         return wavNames
 
-    def _getWav(self, wavName):
+    async def _getWav(self, wavName):
         if wavName in self._wavs:
             return self._wavs[wavName]
         url = urllib.parse.urljoin(self._CDN_ROOT_URL, f'/audio/{wavName}')
         headers = self._getHeaders()
         log.debug(f'Downloading wav {wavName} this may take a moment.')
         with Timer(f'Time to get Wav {wavName}', log.info):
-            resp = requests.get(url, headers=headers)  ##TODO: this should be async
+            resp = await runInExecutor(requests.get, url, headers=headers)
         self._checkResponse(resp)
         self._wavs[wavName] = resp.content
         return self._wavs[wavName]
@@ -154,7 +158,7 @@ class FifteenAIClient(Resource):
 
 def main():
     client = FifteenAIClient()
-    client.getTTS('test', 'SpongeBob SquarePagnts')
+    client.getTTS('test', 'SpongeBob SquarePants')
 
 if __name__ == '__main__':
     main()

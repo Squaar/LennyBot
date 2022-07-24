@@ -9,11 +9,12 @@ from functools import wraps
 from .resources import RESOURCE_DICTIONARY
 from .fifteenai import FifteenAIClient
 from . import message_parser
+from .utils import getIP
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s]%(levelname)s-%(name)s-%(message)s')
 logger = logging.getLogger(__name__)
 
-authorized_users = [135265595925987328, 137772624133488641]
+authorized_users = (135265595925987328, 137772624133488641)
 lennys_id = 160962479013363712  # human lenny
 # lennys_id = 135265595925987328  # squaar
 squaars_id = 135265595925987328
@@ -32,15 +33,18 @@ def authenticate(func):
         user_id = None
         if len(args) >= 2:
             self = args[0]
-            if isinstance(args[1], argparse.Namespace):
-                user_id = int(args[1].message.author.id)
-            elif isinstance(args[1], discord.message.Message):
-                user_id = int(args[1].author.id)
-            elif isinstance(args[1], werkzeug.local.LocalProxy):
-                user_id = int(args[1]['user_id'])
+            context = args[1]
+            if isinstance(context, argparse.Namespace):
+                user_id = int(context.message.author.id)
+            elif isinstance(context, discord.message.Message):
+                user_id = int(context.author.id)
+            elif isinstance(context, werkzeug.local.LocalProxy):
+                user_id = int(context['user_id'])
+            elif isinstance(context, LennyInitiatedContext):
+                user_id = self.user.id
         if not user_id:
             raise AuthenticationError('Couldn\'t authenticate: %s; %s; %s' % (func.__name__, args, kwargs), func)
-        if user_id in authorized_users:
+        if user_id in authorized_users + (self.user.id, ):
             return func(*args, **kwargs)
         else:
             raise AuthenticationError(f'{user_id} not authorized!')
@@ -50,7 +54,8 @@ def authenticate(func):
 class LennyBot(message_parser.MessageParseMixin, discord.Client):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        intents = self._getDiscordIntents()
+        super().__init__(intents=intents, *args, **kwargs)
         self._realboi = True
         self._dadmode = True
         self._hi_im_lenny = True
@@ -58,6 +63,12 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         self._audio_queue = asyncio.Queue()
         self._audio_task = None
         self._join_voice = kwargs.get('join_voice', True)  ##TODO: change this to str arg and join the given channel, add to argparse
+
+    @classmethod
+    def _getDiscordIntents(cls):
+        intents = discord.Intents.default()
+        intents.members = True
+        return intents
 
     def find_channel(self, server_name, channel_name):
         for server in self.guilds:
@@ -109,7 +120,7 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
                 await self.connect_voice('Game Bois', 'Bot Testing')
             except RuntimeError as e:
                 logger.exception(e)
-
+        await self.message_squaar(LennyInitiatedContext(), f'Lennybot logged in {getIP()}')
 
     async def on_message(self, message):
         logger.info('%s/%s[%s]: %s' % (message.guild, message.channel, message.author, message.content.encode('utf-8')))
@@ -206,7 +217,7 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         if after is None:
             after = lambda e: f'Audio error: {e}'
         try:
-            source = resource.getAudioSource()
+            source = await resource.getAudioSource()
             source = discord.PCMVolumeTransformer(source)
             self._voice_client.play(source, after=after)
             # await context.channel.send(f'Playing {resource.name}.')
@@ -388,6 +399,9 @@ def a_to_emoji(char):
     if ord(char) >= ord('a') and ord(char) <= ord('z'):
         return chr(127365 + ord(char))
     return char
+
+class LennyInitiatedContext:
+    pass
 
 
 class AuthenticationError(Exception):

@@ -1,6 +1,9 @@
 import os.path
 import datetime
 import logging
+import asyncio
+import functools
+import requests
 
 log = logging.getLogger(__name__)
 
@@ -27,3 +30,18 @@ class Timer:
         if exc and not all([val is None for val in exc]):
             log.error(str(exc))
         log.debug(str(exc))
+
+# async def asyncGet(*args, **kwargs):
+#     loop = asyncio.get_running_loop()
+#     fn = functools.partial(requests.get, *args, **kwargs)
+#     resp = await loop.run_in_executor(None, fn)
+
+async def runInExecutor(fn, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    fn = functools.partial(fn, *args, **kwargs)
+    ret = await loop.run_in_executor(None, fn)
+    return ret
+
+
+def getIP():
+    pass
