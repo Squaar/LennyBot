@@ -116,8 +116,8 @@ class LennyBot(message_parser.MessageParseMixin, discord.Client):
         logger.info('Lennybot logged in: %s, %s' % (self.user.name, self.user.id))
         if self._join_voice:
             try:
-                # await self.connect_voice('Game Bois', 'Lenny land')
-                await self.connect_voice('Game Bois', 'Bot Testing')
+                await self.connect_voice('Game Bois', 'Lenny land')
+                # await self.connect_voice('Game Bois', 'Bot Testing')
             except RuntimeError as e:
                 logger.exception(e)
         await self.message_squaar(LennyInitiatedContext(), f'Lennybot logged in @ {await getIP()}')
