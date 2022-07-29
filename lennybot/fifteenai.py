@@ -68,7 +68,7 @@ class FifteenAIClient(Resource):
         log.debug('Generating Wavs, this may take a moment.')
         with Timer('Time to generate Wavs', log.info):
             resp = await runInExecutor(requests.post, url, data=payload, headers=headers)
-        self.checkResponse(resp)
+        checkResponse(resp)
         if not resp.json().get('wavNames'):
             raise RuntimeError(f'No wavNames returned from 15.ai')
         wavNames = resp.json()['wavNames']
@@ -83,7 +83,7 @@ class FifteenAIClient(Resource):
         log.debug(f'Downloading wav {wavName} this may take a moment.')
         with Timer(f'Time to get Wav {wavName}', log.info):
             resp = await runInExecutor(requests.get, url, headers=headers)
-        self.checkResponse(resp)
+        checkResponse(resp)
         self._wavs[wavName] = resp.content
         return self._wavs[wavName]
 
